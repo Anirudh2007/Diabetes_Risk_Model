@@ -10,35 +10,14 @@
   <div class="page">
     <header>
       <h1>Diabetes Risk Checker</h1>
-      <p>Enter your medical details to estimate the probability of diabetes using the project model.</p>
+      <p>Enter your medical details to estimate the probability of diabetes using the 8D Bayesian classifier.</p>
     </header>
 
     <section class="card">
       <form method="post" novalidate>
-        <div class="section-title">Select model</div>
-        <div class="radio-group">
-          {% for option in model_options %}
-          <label class="radio-label">
-            <input type="radio" name="model" value="{{ option.id }}" {% if selected_model == option.id %}checked{% endif %}>
-            <strong>{{ option.label }}</strong><br>
-            <span>{{ option.description }}</span>
-          </label>
-          {% endfor %}
-        </div>
-
         <div class="section-title">Medical details</div>
-        <div class="grid-form form-fields-all {% if selected_model == '2d' %}hidden{% endif %}">
+        <div class="grid-form">
           {% for name in feature_names %}
-          <label>
-            <span>{{ feature_labels[name] }}</span>
-            <input type="number" name="{{ name }}" step="any" value="{{ request.form.get(name, '') }}" required>
-            <small class="optimal-hint">Optimal: {{ feature_optimals[name] }}</small>
-          </label>
-          {% endfor %}
-        </div>
-
-        <div class="grid-form form-fields-2d {% if selected_model != '2d' %}hidden{% endif %}">
-          {% for name in ["Glucose", "BMI"] %}
           <label>
             <span>{{ feature_labels[name] }}</span>
             <input type="number" name="{{ name }}" step="any" value="{{ request.form.get(name, '') }}" required>
@@ -62,43 +41,12 @@
       <h2>Predicted risk</h2>
       <p class="risk-text">{{ "{:.1f}".format(result.probability) if result.probability >= 0.1 else "{:.4f}".format(result.probability) }}% <small>chance of diabetes</small></p>
       <p>{{ result.message }}</p>
-      <p class="model-label">Model used: {{ result.model_name }}</p>
     </section>
     {% endif %}
 
     <footer>
-      <p>Powered by the project’s 8D Bayesian diabetes risk model.</p>
+      <p>Powered by the project's 8D Bayesian diabetes risk model.</p>
     </footer>
   </div>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const form = document.querySelector('form');
-      const modelRadios = form.querySelectorAll('input[name="model"]');
-      const fullFields = document.querySelector('.form-fields-all');
-      const twoDFields = document.querySelector('.form-fields-2d');
-
-      function updateFieldVisibility() {
-        const selectedModel = form.querySelector('input[name="model"]:checked')?.value;
-        const showing2d = selectedModel === '2d';
-
-        fullFields.classList.toggle('hidden', showing2d);
-        twoDFields.classList.toggle('hidden', !showing2d);
-
-        fullFields.querySelectorAll('input').forEach(function (input) {
-          input.disabled = showing2d;
-        });
-        twoDFields.querySelectorAll('input').forEach(function (input) {
-          input.disabled = !showing2d;
-        });
-      }
-
-      modelRadios.forEach(function (radio) {
-        radio.addEventListener('change', updateFieldVisibility);
-      });
-
-      updateFieldVisibility();
-    });
-  </script>
 </body>
 </html>

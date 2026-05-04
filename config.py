@@ -17,9 +17,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Input data path
 DATA_PATH = os.path.join(BASE_DIR, "archive", "diabetes.csv")
 
-# Output directories
+# Output directory
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 
 # ──────────────────────────────────────────────
 # Dataset Feature Configuration
@@ -83,34 +82,8 @@ RANDOM_STATE = 42
 COVARIANCE_REGULARIZATION = 1e-6
 
 # ──────────────────────────────────────────────
-# Threshold Optimization
+# Decision Threshold
 # ──────────────────────────────────────────────
 
-# Number of candidate thresholds to evaluate between 0 and 1
-THRESHOLD_SEARCH_POINTS = 1000
-
-# ──────────────────────────────────────────────
-# Statistical Testing
-# ──────────────────────────────────────────────
-
-# Significance level for Welch's t-tests
-SIGNIFICANCE_ALPHA = 0.05
-
-# ──────────────────────────────────────────────
-# Visualization Parameters
-# ──────────────────────────────────────────────
-
-# Resolution for saved plots
-PLOT_DPI = 150
-
-# Grid resolution for the 2D risk heatmap
-HEATMAP_GRID_RESOLUTION = 100
-
-# Plot filenames
-PLOT_FILENAMES = {
-    "risk_heatmap": "01_risk_heatmap_glucose_bmi.png",
-    "threshold_analysis": "02_threshold_analysis.png",
-    "roc_curve": "03_roc_curve.png",
-    "correlation_heatmap": "04_correlation_heatmap.png",
-    "ttest_means": "05_ttest_feature_means.png",
-}
+# Fixed decision threshold used for evaluation and web UI
+DECISION_THRESHOLD = 0.5
