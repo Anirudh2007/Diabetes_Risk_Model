@@ -1,10 +1,10 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
+import csv
 
-from config import FEATURE_NAMES, LOG_TRANSFORM_OFFSET, ZERO_INVALID_COLUMNS
-from src.data_cleaning import run_cleaning_pipeline
+from config import DATA_PATH, FEATURE_NAMES, LOG_TRANSFORM_OFFSET, RANDOM_STATE, TARGET_COLUMN, TEST_SIZE, ZERO_INVALID_COLUMNS
 from src.model import BayesDiabetesClassifier
+from sklearn.model_selection import train_test_split
 
 # Set Streamlit page config
 st.set_page_config(
@@ -71,15 +71,71 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def load_dataset_arrays(filepath: str = DATA_PATH) -> tuple[np.ndarray, np.ndarray]:
+    """Load the dataset into feature and target arrays without pandas."""
+    with open(filepath, newline="", encoding="utf-8") as csv_file:
+        reader = csv.DictReader(csv_file)
+        rows = list(reader)
+
+    features = np.array(
+        [[float(row[feature]) for feature in FEATURE_NAMES] for row in rows],
+        dtype=np.float64,
+    )
+    target = np.array([int(float(row[TARGET_COLUMN])) for row in rows], dtype=np.int64)
+    return features, target
+
+
+def impute_invalid_zeros_array(dataframe: np.ndarray, noise_sigma: float = 0.1) -> np.ndarray:
+    """Replace invalid zero readings using Gaussian-noise imputation."""
+    cleaned = dataframe.astype(np.float64, copy=True)
+
+    for feature_name in ZERO_INVALID_COLUMNS:
+        column_index = FEATURE_NAMES.index(feature_name)
+        zero_mask = cleaned[:, column_index] == 0
+        if not np.any(zero_mask):
+            continue
+
+        valid_values = cleaned[~zero_mask, column_index]
+        column_mean = valid_values.mean()
+        noise = np.random.normal(0, noise_sigma, size=int(zero_mask.sum()))
+        cleaned[zero_mask, column_index] = np.clip(column_mean + noise, a_min=0.01, a_max=None)
+
+    return cleaned
+
+
+def apply_log_transforms_array(dataframe: np.ndarray) -> np.ndarray:
+    """Apply the app's log transforms using numpy arrays."""
+    transformed = dataframe.astype(np.float64, copy=True)
+    for feature_name in ["Pregnancies", "Insulin"]:
+        column_index = FEATURE_NAMES.index(feature_name)
+        transformed[:, column_index] = np.log(transformed[:, column_index] + LOG_TRANSFORM_OFFSET)
+    return transformed
+
+
 # Train Bayes classifier model once using cache
 @st.cache_resource
 def load_and_train_model():
-    _, X_train, X_test, y_train, y_test = run_cleaning_pipeline()
+    np.random.seed(RANDOM_STATE)
+
+    X_raw, y_raw = load_dataset_arrays()
+    X_clean = impute_invalid_zeros_array(X_raw)
+    X_clean = apply_log_transforms_array(X_clean)
+
+    X_train, _, y_train, _ = train_test_split(
+        X_clean,
+        y_raw,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
+        stratify=y_raw,
+    )
+
     model = BayesDiabetesClassifier()
     model.fit(X_train, y_train)
 
-    training_df = pd.DataFrame(X_train, columns=FEATURE_NAMES)
-    training_means = training_df.mean().to_dict()
+    training_means = {
+        feature_name: float(X_train[:, index].mean())
+        for index, feature_name in enumerate(FEATURE_NAMES)
+    }
     return model, training_means
 
 model, training_means = load_and_train_model()
@@ -172,11 +228,12 @@ if submitted:
             val = float(training_means.get(feature, 1.0))
         values.append(val)
 
-    df_user = pd.DataFrame([values], columns=FEATURE_NAMES)
+    df_user = np.array([values], dtype=np.float64)
     for feature in ["Pregnancies", "Insulin"]:
-        df_user[feature] = np.log(df_user[feature] + LOG_TRANSFORM_OFFSET)
+        column_index = FEATURE_NAMES.index(feature)
+        df_user[:, column_index] = np.log(df_user[:, column_index] + LOG_TRANSFORM_OFFSET)
 
-    prob = float(model.predict_probabilities(df_user.values)[0]) * 100.0
+    prob = float(model.predict_probabilities(df_user)[0]) * 100.0
 
     st.markdown("---")
     if prob >= 50.0:
