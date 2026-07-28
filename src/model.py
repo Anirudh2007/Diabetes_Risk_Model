@@ -196,7 +196,7 @@ class BayesDiabetesClassifier:
         )
         probabilities = np.clip(probabilities, 0.0, 1.0)
 
-        return probabilities
+        return np.atleast_1d(probabilities)
 
     def predict(self, X: np.ndarray, threshold: float = 0.5) -> np.ndarray:
         """
@@ -210,7 +210,7 @@ class BayesDiabetesClassifier:
             Binary predictions array of shape (n_samples,).
         """
         probabilities = self.predict_probabilities(X)
-        return (probabilities >= threshold).astype(int)
+        return (np.atleast_1d(probabilities) >= threshold).astype(int)
 
     def _compute_regularized_covariance(self, X: np.ndarray) -> np.ndarray:
         """
