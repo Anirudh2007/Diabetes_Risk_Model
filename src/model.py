@@ -150,8 +150,6 @@ class BayesDiabetesClassifier:
         For a feature vector x:
             P(class=1 | x) = P(x|1)·P(1) / [P(x|0)·P(0) + P(x|1)·P(1)]
 
-        Uses log probabilities to avoid numerical underflow in high dimensions.
-
         Args:
             X: Feature matrix of shape (n_samples, 8).
 
@@ -167,26 +165,27 @@ class BayesDiabetesClassifier:
         if X.ndim == 1:
             X = X.reshape(1, -1)
 
-        # ── Class-conditional log-likelihoods ──
-        # log P(x | class=0) and log P(x | class=1)
-        log_likelihood_class0 = self.distribution_non_diabetic.logpdf(X)
-        log_likelihood_class1 = self.distribution_diabetic.logpdf(X)
+        # ── Class-conditional likelihoods ──
+        # P(x | class=0) and P(x | class=1)
+        likelihood_class0 = self.distribution_non_diabetic.pdf(X)
+        likelihood_class1 = self.distribution_diabetic.pdf(X)
 
-        # ── Log numerator and denominator of Bayes' theorem ──
-        # log(P(x|1)·P(1)) = log P(x|1) + log P(1)
-        log_numerator = log_likelihood_class1 + np.log(self.prior_diabetic)
-        
-        # log(P(x|0)·P(0) + P(x|1)·P(1)) = log_sum_exp(log(P(x|0)·P(0)), log(P(x|1)·P(1)))
-        log_term0 = log_likelihood_class0 + np.log(self.prior_non_diabetic)
-        log_term1 = log_likelihood_class1 + np.log(self.prior_diabetic)
-        log_denominator = np.logaddexp(log_term0, log_term1)
+        # ── Numerator and denominator of Bayes' theorem ──
+        numerator = likelihood_class1 * self.prior_diabetic
+        denominator = (
+            likelihood_class0 * self.prior_non_diabetic
+            + likelihood_class1 * self.prior_diabetic
+        )
 
-        # ── Log posterior probability ──
-        # log P(class=1 | x) = log(P(x|1)·P(1)) - log(denominator)
-        log_posterior = log_numerator - log_denominator
-
-        # ── Convert back to probability space ──
-        probabilities = np.exp(log_posterior)
+        # ── Handle numerical edge case: both likelihoods ≈ 0 ──
+        # When a sample is far from both class distributions, return
+        # the prior as a neutral fallback
+        zero_denominator_mask = denominator < 1e-300
+        probabilities = np.where(
+            zero_denominator_mask,
+            self.prior_diabetic,  # Fallback to prior
+            numerator / denominator,
+        )
 
         # ── Final NaN/Inf safety check ──
         probabilities = np.nan_to_num(
@@ -197,7 +196,7 @@ class BayesDiabetesClassifier:
         )
         probabilities = np.clip(probabilities, 0.0, 1.0)
 
-        return np.atleast_1d(probabilities)
+        return probabilities
 
     def predict(self, X: np.ndarray, threshold: float = 0.5) -> np.ndarray:
         """
